@@ -1,4 +1,4 @@
-// 機種データ（あとから追加OK）
+// 機種データ
 const MODELS = [
     /* ===== HD / BF ===== */
     {
@@ -218,9 +218,13 @@ const elItems = document.getElementById("itemsArea");
 const elBadge = document.getElementById("countBadge");
 const elSelectAll = document.getElementById("selectAllBtn");
 const elClear = document.getElementById("clearBtn");
+const elDownload = document.getElementById("downloadBtn");
 const elPreview = document.getElementById("selectedPreview");
 
 let currentFields = [];
+// selectedSet will store objects: { name: "Weight", value: "60kg" } or just track names?
+// To keep it simple, let's keep selectedSet as a Set of names for easy toggle logic,
+// but we need to grab values from the inputs when generating the file.
 let selectedSet = new Set();
 
 function initModelSelect() {
@@ -237,10 +241,18 @@ function initModelSelect() {
 function setButtonsEnabled(enabled) {
     elSelectAll.disabled = !enabled;
     elClear.disabled = !enabled;
+    // Download button logic might depend on if items are actually selected
+    updateDownloadButton();
+}
+
+function updateDownloadButton() {
+    // Enable download if at least one item is checked
+    elDownload.disabled = (selectedSet.size === 0);
 }
 
 function updateBadge() {
     elBadge.textContent = `${selectedSet.size}/${currentFields.length}`;
+    updateDownloadButton();
 }
 
 function renderPreview() {
@@ -267,7 +279,7 @@ function renderPreview() {
 
 function renderCheckboxes(fields) {
     currentFields = Array.isArray(fields) ? fields : [];
-    selectedSet = new Set(); // 機種変更時はリセット（保持したいならここを変更）
+    selectedSet = new Set(); 
 
     if (!currentFields.length) {
         elItems.className = "empty";
@@ -297,20 +309,70 @@ function renderCheckboxes(fields) {
         text.className = "checkLabel";
         text.textContent = name;
 
+        // Input for value
+        const valInput = document.createElement("input");
+        valInput.type = "text"; // allowing units like "kg" if user wants, or number
+        valInput.className = "checkValueInput";
+        valInput.placeholder = "数値を入力";
+        valInput.addEventListener("click", (e) => {
+            // Prevent clicking input from toggling the label/checkbox
+            e.preventDefault();
+        });
+
         cb.addEventListener("change", () => {
-            if (cb.checked) selectedSet.add(name);
-            else selectedSet.delete(name);
+            if (cb.checked) {
+                selectedSet.add(name);
+                label.classList.add("active");
+                valInput.focus();
+            } else {
+                selectedSet.delete(name);
+                label.classList.remove("active");
+            }
             updateBadge();
             renderPreview();
         });
 
         label.appendChild(cb);
         label.appendChild(text);
+        label.appendChild(valInput);
         elItems.appendChild(label);
     });
 
     updateBadge();
     renderPreview();
+}
+
+function generateFile() {
+    const modelId = elModel.value;
+    const modelName = MODELS.find(m => m.id === modelId)?.name || "Unknown Model";
+    
+    let content = `機種: ${modelName}\n作成日時: ${new Date().toLocaleString()}\n\n`;
+    content += `【記録項目】\n`;
+
+    // Iterate over currentFields to maintain order, check if in selectedSet
+    currentFields.forEach((name, idx) => {
+        if (selectedSet.has(name)) {
+            // Find input value
+            // Since we reconstructed DOM, we can find it by ID relative logic or just query
+            // Easy way: select by ID field_{idx} to get checkbox, then sibling
+            const cb = document.getElementById(`field_${idx}`);
+            // sibling is text then input
+            // safer to traverse parent
+            const parent = cb.closest('.checkItem');
+            const valInput = parent.querySelector('.checkValueInput');
+            const val = valInput.value.trim();
+            
+            content += `- ${name}: ${val}\n`;
+        }
+    });
+
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const mockLink = document.createElement("a");
+    mockLink.href = url;
+    mockLink.download = `TANITA_Record_${modelId}.txt`;
+    mockLink.click();
+    URL.revokeObjectURL(url);
 }
 
 elModel.addEventListener("change", () => {
@@ -319,22 +381,35 @@ elModel.addEventListener("change", () => {
 });
 
 elSelectAll.addEventListener("click", () => {
-    const inputs = elItems.querySelectorAll('input[type="checkbox"]');
-    inputs.forEach(i => {
-        i.checked = true;
-        selectedSet.add(i.value);
+    const items = elItems.querySelectorAll('.checkItem');
+    items.forEach(item => {
+        const cb = item.querySelector('input[type="checkbox"]');
+        if (!cb.checked) {
+            cb.checked = true;
+            item.classList.add("active");
+            selectedSet.add(cb.value);
+        }
     });
     updateBadge();
     renderPreview();
 });
 
 elClear.addEventListener("click", () => {
-    const inputs = elItems.querySelectorAll('input[type="checkbox"]');
-    inputs.forEach(i => (i.checked = false));
-    selectedSet.clear();
+    const items = elItems.querySelectorAll('.checkItem');
+    items.forEach(item => {
+        const cb = item.querySelector('input[type="checkbox"]');
+        const valInput = item.querySelector('.checkValueInput');
+        
+        cb.checked = false;
+        item.classList.remove("active");
+        selectedSet.delete(cb.value);
+        valInput.value = ""; // clear input too? maybe better usability
+    });
     updateBadge();
     renderPreview();
 });
+
+elDownload.addEventListener("click", generateFile);
 
 initModelSelect();
 setButtonsEnabled(false);

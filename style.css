@@ -286,6 +286,16 @@ body {
     background: rgba(255, 79, 161, .10);
 }
 
+.btn.primary {
+    border-color: var(--violet);
+    background: var(--violet);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(108, 124, 255, 0.4);
+}
+.btn.primary:hover {
+    box-shadow: 0 8px 18px rgba(108, 124, 255, 0.5);
+}
+
 .btn:disabled {
     opacity: .45;
     cursor: not-allowed;
@@ -345,6 +355,19 @@ body {
 .checkLabel {
     font-size: 13px;
     color: rgba(31, 42, 55, .92);
+    flex: 1;
+}
+
+.checkValueInput {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 13px;
+    width: 100px;
+    display: none; /* hidden by default */
+}
+.checkItem.active .checkValueInput {
+    display: block;
 }
 
 /* ===== Preview ===== */
